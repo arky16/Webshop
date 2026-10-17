@@ -7,6 +7,10 @@ use argon2::{
         PasswordHasher, SaltString, rand_core::OsRng,
     },
 };
+use argon2::password_hash::{PasswordHash, PasswordVerifier};
+use jsonwebtoken::{encode, EncodingKey, Header};
+use std::time::{SystemTime, UNIX_EPOCH};
+use crate::models::claims::Claims;
 
 #[derive(Debug)]
 pub enum RegisterError{
@@ -48,4 +52,47 @@ pub async fn register_user(pool: &PgPool, email: &str, password: &str) -> Result
         }
     }
 }
+
+#[derive(Debug)]
+pub enum LoginError{
+    InvalidCredentials,
+    TokenCreation,
+    Configuration,
+}
+
+pub async fn login_user(pool: &PgPool, email: &str, password: &str)->Result<(User, String), LoginError>{
+    let email = email.trim().to_lowercase();
+
+    let user = auth_repository::find_by_email(pool, &email)
+        .await
+        .map_err(|_| LoginError::InvalidCredentials)?
+        .ok_or(LoginError::InvalidCredentials)?;
+
+    let parsed_hash = PasswordHash::new(&user.password_hash)
+        .map_err(|_| LoginError::InvalidCredentials)?;
+
+    Argon2::default()
+        .verify_password(password.as_bytes(), &parsed_hash)
+        .map_err(|_| LoginError::InvalidCredentials)?;
+
+    let secret = std::env::var("JWT_SECRET")
+        .map_err(|_| LoginError::Configuration)?;
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| LoginError::TokenCreation)?
+        .as_secs();
+
+    let claims = Claims{
+        sub: user.id.to_string(),
+        role: user.role.clone(),
+        exp: now + 3600,
+    };
+
+    let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(secret.as_bytes())).map_err(|_| LoginError::TokenCreation)?;
+
+    Ok((user, token))
+}
+
+
 
