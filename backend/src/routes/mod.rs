@@ -1,3 +1,4 @@
+use actix_web::http::Method;
 use actix_web::web;
 use actix_web_httpauth::middleware::HttpAuthentication;
 
@@ -10,8 +11,26 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
 
     cfg.service(
         web::scope("/api/products")
-            .service(crate::handlers::products::list_products)
-            .service(crate::handlers::products::get_product),
+            .service(web::resource("")
+                    .route(web::get()
+                        .to(crate::handlers::products::list_products))
+                    .route(web::route()
+                        .method(Method::POST)
+                        .to(crate::handlers::products::create_product)
+                        .wrap(HttpAuthentication::bearer(crate::auth_middleware::admin_validator)))
+            )
+            .service(web::resource("/{id}")
+                    .route(web::get()
+                            .to(crate::handlers::products::get_product))
+                    .route(web::route()
+                            .method(Method::PUT)
+                            .to(crate::handlers::products::update_product)
+                            .wrap(HttpAuthentication::bearer(crate::auth_middleware::admin_validator)))
+                    .route(web::route()
+                            .method(Method::DELETE)
+                            .to(crate::handlers::products::delete_product)
+                            .wrap(HttpAuthentication::bearer(crate::auth_middleware::admin_validator)))
+            )
     );
     
     cfg.service(

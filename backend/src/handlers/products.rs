@@ -1,6 +1,6 @@
 use crate::services::products as product_service;
 use crate::state::AppState;
-use actix_web::{HttpResponse, get, post, put, delete, web, App};
+use actix_web::{HttpResponse, web};
 use uuid::Uuid;
 use crate::models::product_request::ProductRequest;
 use rust_decimal::Decimal;
@@ -11,7 +11,6 @@ fn validate_product_request(request: &ProductRequest) -> bool{
     request.validate().is_ok() && request.price >= Decimal::ZERO && request.price.scale() <= 2
 }
 
-#[get("")]
 pub async fn list_products(state: web::Data<AppState>) -> HttpResponse {
     match product_service::list_products(&state.db).await {
         Ok(products) => HttpResponse::Ok().json(products),
@@ -26,7 +25,6 @@ pub async fn list_products(state: web::Data<AppState>) -> HttpResponse {
     }
 }
 
-#[get("/{id}")]
 pub async fn get_product(state: web::Data<AppState>, path: web::Path<Uuid>) -> HttpResponse {
     match product_service::get_product(&state.db, path.into_inner()).await {
         Ok(Some(product)) => HttpResponse::Ok().json(product),
@@ -45,7 +43,6 @@ pub async fn get_product(state: web::Data<AppState>, path: web::Path<Uuid>) -> H
     }
 }
 
-#[post("")]
 pub async fn create_product(state: web::Data<AppState>, body: web::Json<ProductRequest>) -> HttpResponse{
     if !validate_product_request(&body) {
         return HttpResponse::BadRequest().json(serde_json::json!({
@@ -66,7 +63,6 @@ pub async fn create_product(state: web::Data<AppState>, body: web::Json<ProductR
     }
 }
 
-#[put("/{id}")]
 pub async fn update_product(state: web::Data<AppState>, path: web::Path<Uuid>, body: web::Json<ProductRequest>)-> HttpResponse{
     if !validate_product_request(&body) {
         return HttpResponse::BadRequest().json(serde_json::json!({
@@ -94,7 +90,6 @@ pub async fn update_product(state: web::Data<AppState>, path: web::Path<Uuid>, b
     }
 }
 
-#[delete("/{id}")]
 pub async fn delete_product(state: web::Data<AppState>, path: web::Path<Uuid>) -> HttpResponse {
     match product_service::deactivate_product(&state.db, path.into_inner()).await {
         Ok(true) => HttpResponse::NoContent().finish(),
