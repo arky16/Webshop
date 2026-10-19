@@ -38,4 +38,12 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("/me", web::get().to(crate::handlers::auth::me),)
             .wrap(HttpAuthentication::bearer(crate::auth_middleware::validator)),
     );
+    
+    cfg.service(
+        web::scope("/api/cart")
+            .route("", web::get().to(crate::handlers::cart::get_cart))
+            .route("", web::post().to(crate::handlers::cart::add_to_cart))
+            .route("/{product_id}", web::delete().to(crate::handlers::cart::remove_from_cart))
+            .wrap(HttpAuthentication::bearer(crate::auth_middleware::validator))
+    );
 }
