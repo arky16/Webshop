@@ -46,4 +46,10 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("/{product_id}", web::delete().to(crate::handlers::cart::remove_from_cart))
             .wrap(HttpAuthentication::bearer(crate::auth_middleware::validator))
     );
+
+    cfg.service(
+        web::scope("/api/orders")
+            .route("/checkout", web::post().to(crate::handlers::orders::checkout))
+            .wrap(HttpAuthentication::bearer(crate::auth_middleware::validator))
+    );
 }

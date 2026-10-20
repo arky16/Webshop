@@ -4,3 +4,4 @@ pub mod user;
 pub mod claims;
 pub mod product_request;
 pub mod cart;
+pub mod order;
