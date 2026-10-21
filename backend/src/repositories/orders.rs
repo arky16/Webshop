@@ -125,3 +125,43 @@ pub async fn checkout(pool: &PgPool, user_id: Uuid) -> Result<(Order, Vec<OrderI
 
     Ok((order, order_items))
 }
+
+pub async fn find_orders_by_user(pool: &PgPool, user_id: Uuid) -> Result<Vec<Order>, sqlx::Error>{
+    sqlx::query_as::<_, Order>(
+        r#"
+            SELECT id, user_id, status, total_amount, created_at, updated_at
+            FROM orders
+            WHERE user_id = $1
+            ORDER BY created_at DESC
+            "#
+    )
+        .bind(user_id)
+        .fetch_all(pool)
+        .await
+}
+
+pub async fn find_order_items(pool: &PgPool, order_id: Uuid) -> Result<Vec<OrderItem>, sqlx::Error>{
+    sqlx::query_as::<_, OrderItem>(
+        r#"
+            SELECT id, order_id, product_id, quantity, unit_price
+            FROM order_items
+            WHERE order_id = $1
+            ORDER BY id
+            "#
+    )
+        .bind(order_id)
+        .fetch_all(pool)
+        .await
+}
+
+pub async fn find_all_orders(pool: &PgPool) -> Result<Vec<Order>, sqlx::Error>{
+    sqlx::query_as::<_, Order>(
+        r#"
+            SELECT id, user_id, status, total_amount, created_at, updated_at
+            FROM orders
+            ORDER BY created_at DESC
+            "#
+    )
+        .fetch_all(pool)
+        .await
+}

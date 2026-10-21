@@ -53,3 +53,75 @@ pub async fn checkout(req: HttpRequest, state: web::Data<AppState>) -> HttpRespo
         }
     }
 }
+
+pub async fn get_my_orders(req: HttpRequest, state: web::Data<AppState>) -> HttpResponse{
+    let claims = match req.extensions().get::<Claims>().cloned() {
+        Some(claims) => claims,
+        None => {
+            return HttpResponse::Unauthorized().json(serde_json::json!({
+                "error": "UNAUTHORIZED",
+                "message": "Authentication required"
+            }));
+        }
+    };
+
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => {
+            return HttpResponse::Unauthorized().json(serde_json::json!({
+                "error": "INVALID_TOKEN",
+                "message": "Invalid user identifier in token"
+            }));
+        }
+    };
+
+    match crate::services::orders::get_orders_by_user(&state.db, user_id).await {
+        Ok(orders) => {
+            let responce: Vec<_> = orders
+                .into_iter()
+                .map(|(order, items)| {
+                    serde_json::json!({
+                        "order": order,
+                        "items": items
+                    })
+                })
+                .collect();
+
+            HttpResponse::Ok().json(responce)
+        }
+        Err(error) => {
+            eprintln!("Could not load orders: {error}");
+
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "INTERNAL_SERVER_ERROR",
+                "message": "Orders could not be loaded"
+            }))
+        }
+    }
+}
+
+pub async fn get_all_orders(state: web::Data<AppState>) -> Result<HttpResponse, actix_web::Error>{
+    match crate::services::orders::get_all_orders(&state.db).await {
+        Ok(orders) => {
+            let responce: Vec<_> = orders
+                .into_iter()
+                .map(|(order, items)| {
+                    serde_json::json!({
+                        "order": order,
+                        "items": items
+                    })
+                })
+                .collect();
+
+            Ok(HttpResponse::Ok().json(responce))
+        }
+
+        Err(err) => {
+            eprintln!("Failed to fetch orders: {err}");
+
+            Ok(HttpResponse::InternalServerError().json(serde_json::json!({
+                "message": "Failed to fetch orders"
+            })))
+        }
+    }
+}

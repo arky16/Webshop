@@ -50,6 +50,15 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/orders")
             .route("/checkout", web::post().to(crate::handlers::orders::checkout))
+            .route("", web::get().to(crate::handlers::orders::get_my_orders))
             .wrap(HttpAuthentication::bearer(crate::auth_middleware::validator))
     );
+    
+    cfg.service(
+        web::scope("/api/admin")
+            .route("/orders", web::get().to(crate::handlers::orders::get_all_orders))
+            .wrap(HttpAuthentication::bearer(crate::auth_middleware::admin_validator))
+    );
+    
+    
 }
