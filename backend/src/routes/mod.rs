@@ -57,6 +57,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/admin")
             .route("/orders", web::get().to(crate::handlers::orders::get_all_orders))
+            .route("/orders/{order_id}/status", web::patch().to(crate::handlers::orders::update_order_status))
             .wrap(HttpAuthentication::bearer(crate::auth_middleware::admin_validator))
     );
     

@@ -10,6 +10,13 @@ pub enum CheckoutError{
     Database(sqlx::Error)
 }
 
+#[derive(Debug)]
+pub enum UpdateOrderStatusError{
+    NotFound,
+    InvalidTransition,
+    Database(sqlx::Error)
+}
+
 pub async fn checkout(pool: &PgPool, user_id: Uuid) -> Result<(Order, Vec<OrderItem>), CheckoutError>{
     let mut tx = pool.begin().await.map_err(CheckoutError::Database)?;
 
@@ -164,4 +171,63 @@ pub async fn find_all_orders(pool: &PgPool) -> Result<Vec<Order>, sqlx::Error>{
     )
         .fetch_all(pool)
         .await
+}
+
+pub async fn update_order_status(pool: &PgPool, order_id: Uuid, new_status: &str) -> Result<Order, UpdateOrderStatusError>{
+    let mut tx = pool.begin().await.map_err(UpdateOrderStatusError::Database)?;
+
+    let current_status = sqlx::query_scalar::<_, String>(
+        "SELECT status FROM orders WHERE id = $1 FOR UPDATE"
+    )
+        .bind(order_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(UpdateOrderStatusError::Database)?;
+
+    let current_status = match current_status {
+        Some(status) => status,
+        None => return Err(UpdateOrderStatusError::NotFound)
+    };
+
+    let allowed = matches!(
+        (current_status.as_str(), new_status),
+        ("PENDING", "PROCESSING") | ("PENDING", "CANCELLED") | ("PROCESSING", "SHIPPED") | ("SHIPPED", "COMPLETED")
+    );
+
+    if !allowed {
+        return Err(UpdateOrderStatusError::InvalidTransition);
+    }
+
+    if new_status == "CANCELLED" {
+        sqlx::query(
+            r#"
+                UPDATE products p
+                SET stock = p.stock + oi.quantity, updated_at = NOW()
+                FROM order_items oi
+                WHERE oi.orderd_id = $1 AND oi.produc_id = p.id
+                "#
+        )
+            .bind(order_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(UpdateOrderStatusError::Database)?;
+    }
+
+    let order = sqlx::query_as::<_, Order>(
+        r#"
+            UPDATE orders
+            SET status = $2, updated_at = NOW()
+            WHERE id = $1
+            RETURNING id, user_id, status, total_amount, created_at, updated_at
+            "#
+    )
+        .bind(order_id)
+        .bind(new_status)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(UpdateOrderStatusError::Database)?;
+
+    tx.commit().await.map_err(UpdateOrderStatusError::Database)?;
+
+    Ok(order)
 }

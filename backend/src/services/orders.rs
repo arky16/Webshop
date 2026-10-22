@@ -33,3 +33,7 @@ pub async fn get_all_orders(pool: &PgPool) -> Result<Vec<(Order, Vec<OrderItem>)
 
     Ok(result)
 }
+
+pub async fn change_order_status(pool: &PgPool, order_id: Uuid, new_status: &str) -> Result<Order, orders::UpdateOrderStatusError>{
+    orders::update_order_status(pool, order_id, new_status).await
+}

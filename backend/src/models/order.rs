@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use uuid::Uuid;
 
@@ -21,4 +21,9 @@ pub struct OrderItem{
     pub product_id: Uuid,
     pub quantity: i32,
     pub unit_price: Decimal
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateOrderStatusRequest{
+    pub status: String
 }
