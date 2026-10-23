@@ -252,3 +252,17 @@ pub async fn update_order_status(pool: &PgPool, order_id: Uuid, new_status: &str
 
     Ok(order)
 }
+
+pub async fn find_order_items_for_orders(pool: &PgPool, order_ids: &[Uuid]) -> Result<Vec<OrderItem>, sqlx::Error>{
+    sqlx::query_as::<_, OrderItem>(
+        r#"
+            SELECT id, order_id, product_id, quantity, unit_price
+            FROM order_items
+            WHERE order_id = ANY($1)
+            ORDER BY order_id, id
+            "#
+    )
+        .bind(order_ids)
+        .fetch_all(pool)
+        .await
+}

@@ -135,37 +135,44 @@ pub async fn get_all_orders(state: web::Data<AppState>, query: web::Query<crate:
 
     match orders::get_all_orders(&state.db, page, size, status_ref).await {
         Ok((orders, total)) => {
+            let order_ids: Vec<uuid::Uuid> = orders.iter().map(|order| order.id).collect();
+
+            let items = match crate::repositories::orders::find_order_items_for_orders(&state.db, &order_ids).await {
+                Ok(items) => items,
+                Err(err) => {
+                    eprintln!("Failed to fetch order items: {err}");
+
+                    return Ok(HttpResponse::InternalServerError().json(serde_json::json!({
+                    "message": "Failed to fetch order items"
+                    })));
+                }
+            };
+
             let mut response = Vec::with_capacity(orders.len());
 
             for order in orders {
-                match crate::repositories::orders::find_order_items(&state.db, order.id).await {
-                    Ok(items) => {
-                        response.push(serde_json::json!({
-                            "order": order,
-                            "items": items
-                        }));
-                    }
-                    Err(err) => {
-                        eprintln!("Failed to fetch order items: {err}");
+                let order_items: Vec<_> = items
+                    .iter()
+                    .filter(|item| item.order_id == order.id)
+                    .collect();
 
-                        return Ok(HttpResponse::InternalServerError().json(serde_json::json!({
-                                    "message": "Failed to fetch order items"
-                        })));
-                    }
-                }
+                response.push(serde_json::json!({
+                    "order": order,
+                    "items": order_items
+                }));
             }
 
             let total_pages = (total + size - 1) / size;
 
-            Ok(HttpResponse::Ok().json(serde_json::json!({
-                    "orders": response,
-                    "pagination": {
-                        "page": page,
-                        "size": size,
-                        "total": total,
-                        "total_pages": total_pages
-                    }
-            })))
+            return Ok(HttpResponse::Ok().json(serde_json::json!({
+                "orders": response,
+                "pagination": {
+                    "page": page,
+                    "size": size,
+                    "total": total,
+                    "total_pages": total_pages
+                }
+            })));
         }
 
         Err(err) => {
