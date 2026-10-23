@@ -161,16 +161,37 @@ pub async fn find_order_items(pool: &PgPool, order_id: Uuid) -> Result<Vec<Order
         .await
 }
 
-pub async fn find_all_orders(pool: &PgPool) -> Result<Vec<Order>, sqlx::Error>{
-    sqlx::query_as::<_, Order>(
+pub async fn find_all_orders(pool: &PgPool, page: i64, size: i64, status: Option<&str>) -> Result<(Vec<Order>, i64), sqlx::Error>{
+    let offset = page * size;
+
+    let total = sqlx::query_scalar::<_, i64>(
         r#"
-            SELECT id, user_id, status, total_amount, created_at, updated_at
-            FROM orders
-            ORDER BY created_at DESC
-            "#
+        SELECT COUNT(*)
+        FROM orders
+        WHERE ($1::text IS NULL OR status = $1)
+        "#
     )
+        .bind(status)
+        .fetch_one(pool)
+        .await?;
+
+    let orders = sqlx::query_as::<_, Order>(
+        r#"
+        SELECT id, user_id, status, total_amount,
+               created_at, updated_at
+        FROM orders
+        WHERE ($1::text IS NULL OR status = $1)
+        ORDER BY created_at DESC, id DESC
+        LIMIT $2 OFFSET $3
+        "#
+    )
+        .bind(status)
+        .bind(size)
+        .bind(offset)
         .fetch_all(pool)
-        .await
+        .await?;
+
+    Ok((orders, total))
 }
 
 pub async fn update_order_status(pool: &PgPool, order_id: Uuid, new_status: &str) -> Result<Order, UpdateOrderStatusError>{
@@ -204,7 +225,7 @@ pub async fn update_order_status(pool: &PgPool, order_id: Uuid, new_status: &str
                 UPDATE products p
                 SET stock = p.stock + oi.quantity, updated_at = NOW()
                 FROM order_items oi
-                WHERE oi.orderd_id = $1 AND oi.produc_id = p.id
+                WHERE oi.order_id = $1 AND oi.product_id = p.id
                 "#
         )
             .bind(order_id)

@@ -27,3 +27,10 @@ pub struct OrderItem{
 pub struct UpdateOrderStatusRequest{
     pub status: String
 }
+
+#[derive(Debug, Deserialize)]
+pub struct AdminOrdersQuery{
+    pub page: Option<u32>,
+    pub size: Option<u32>,
+    pub status: Option<String>
+}

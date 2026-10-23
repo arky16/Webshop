@@ -102,31 +102,82 @@ pub async fn get_my_orders(req: HttpRequest, state: web::Data<AppState>) -> Http
     }
 }
 
-pub async fn get_all_orders(state: web::Data<AppState>) -> Result<HttpResponse, actix_web::Error>{
-    match crate::services::orders::get_all_orders(&state.db).await {
-        Ok(orders) => {
-            let responce: Vec<_> = orders
-                .into_iter()
-                .map(|(order, items)| {
-                    serde_json::json!({
-                        "order": order,
-                        "items": items
-                    })
-                })
-                .collect();
 
-            Ok(HttpResponse::Ok().json(responce))
+pub async fn get_all_orders(state: web::Data<AppState>, query: web::Query<crate::models::order::AdminOrdersQuery>) -> Result<HttpResponse, actix_web::Error> {
+    let query = query.into_inner();
+
+    let page = query.page.unwrap_or(0);
+    let size = query.size.unwrap_or(10);
+
+    if size == 0 || size > 100 {
+        return Ok(HttpResponse::BadRequest().json(serde_json::json!({
+                "message": "Size must be between 1 and 100"
+            })));
+    }
+
+    let status = query.status.map(|s| s.trim().to_uppercase());
+
+    if let Some(ref s) = status {
+        if !matches!(
+            s.as_str(),
+            "PENDING" | "PAID" | "PROCESSING" | "SHIPPED" | "COMPLETED" | "CANCELLED"
+        ) {
+            return Ok(HttpResponse::BadRequest().json(serde_json::json!({
+                    "message": "Invalid order status filter"
+                })));
+        }
+    }
+
+    let page = i64::from(page);
+    let size = i64::from(size);
+
+    let status_ref = status.as_deref();
+
+    match orders::get_all_orders(&state.db, page, size, status_ref).await {
+        Ok((orders, total)) => {
+            let mut response = Vec::with_capacity(orders.len());
+
+            for order in orders {
+                match crate::repositories::orders::find_order_items(&state.db, order.id).await {
+                    Ok(items) => {
+                        response.push(serde_json::json!({
+                            "order": order,
+                            "items": items
+                        }));
+                    }
+                    Err(err) => {
+                        eprintln!("Failed to fetch order items: {err}");
+
+                        return Ok(HttpResponse::InternalServerError().json(serde_json::json!({
+                                    "message": "Failed to fetch order items"
+                        })));
+                    }
+                }
+            }
+
+            let total_pages = (total + size - 1) / size;
+
+            Ok(HttpResponse::Ok().json(serde_json::json!({
+                    "orders": response,
+                    "pagination": {
+                        "page": page,
+                        "size": size,
+                        "total": total,
+                        "total_pages": total_pages
+                    }
+            })))
         }
 
         Err(err) => {
             eprintln!("Failed to fetch orders: {err}");
 
             Ok(HttpResponse::InternalServerError().json(serde_json::json!({
-                "message": "Failed to fetch orders"
+                        "message": "Failed to fetch orders"
             })))
         }
     }
 }
+
 
 pub async fn update_order_status(state: web::Data<AppState>, path: web::Path<Uuid>, body: web::Json<UpdateOrderStatusRequest>) -> Result<HttpResponse, actix_web::Error>{
     let order_id = path.into_inner();

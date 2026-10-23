@@ -21,17 +21,8 @@ pub async fn get_orders_by_user(pool: &PgPool, user_id: Uuid)->Result<Vec<(Order
     Ok(result)
 }
 
-pub async fn get_all_orders(pool: &PgPool) -> Result<Vec<(Order, Vec<OrderItem>)>, sqlx::Error>{
-    let orders = orders::find_all_orders(pool).await?;
-
-    let mut result = Vec::with_capacity(orders.len());
-
-    for order in orders {
-        let items = orders::find_order_items(pool, order.id).await?;
-        result.push((order, items));
-    }
-
-    Ok(result)
+pub async fn get_all_orders(pool: &PgPool, page: i64, size: i64, status: Option<&str>) -> Result<(Vec<Order>, i64), sqlx::Error>{
+    orders::find_all_orders(pool, page, size, status).await
 }
 
 pub async fn change_order_status(pool: &PgPool, order_id: Uuid, new_status: &str) -> Result<Order, orders::UpdateOrderStatusError>{
