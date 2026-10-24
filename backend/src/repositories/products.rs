@@ -1,18 +1,81 @@
 use crate::models::product::Product;
 use sqlx::PgPool;
 use uuid::Uuid;
-use crate::models::product_request::ProductRequest;
+use crate::models::product_request::{ProductRequest, ProductQuery};
 
-pub async fn find_all(pool: &PgPool) -> Result<Vec<Product>, sqlx::Error> {
-    sqlx::query_as::<_, Product>(
-        r#"SELECT id, name, description, price, stock, category, active, created_at, updated_at
-                FROM products
-                WHERE active = TRUE
-                ORDER BY created_at DESC
-            "#,
+pub async fn find_all(pool: &PgPool, query: &ProductQuery, page: i64, size: i64, sort_by: &str, order: &str) -> Result<(Vec<Product>, i64), sqlx::Error> {
+    let offset = page * size;
+
+    let search = query
+        .search
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(|s| format!("%{s}%"));
+
+    let category = query
+        .category
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+
+    let min_price = query.min_price;
+    let max_price = query.max_price;
+
+    let total = sqlx::query_scalar::<_, i64>(
+        r#"
+        SELECT COUNT(*)
+        FROM products
+        WHERE active = TRUE
+          AND ($1::text IS NULL OR name ILIKE $1)
+          AND ($2::text IS NULL OR category = $2)
+          AND ($3::numeric IS NULL OR price >= $3)
+          AND ($4::numeric IS NULL OR price <= $4)
+        "#
     )
-    .fetch_all(pool)
-    .await
+        .bind(&search)
+        .bind(category)
+        .bind(min_price)
+        .bind(max_price)
+        .fetch_one(pool)
+        .await?;
+
+    let sort_column = match sort_by {
+        "price" => "price",
+        "name" => "name",
+        _ => "created_at",
+    };
+
+    let sort_direction = match order {
+        "asc" => "ASC",
+        _ => "DESC",
+    };
+
+    let sql = format!(
+        r#"
+        SELECT id, name, description, price, stock, category, active, created_at, updated_at
+        FROM products
+        WHERE active = TRUE
+          AND ($1::text IS NULL OR name ILIKE $1)
+          AND ($2::text IS NULL OR category = $2)
+          AND ($3::numeric IS NULL OR price >= $3)
+          AND ($4::numeric IS NULL OR price <= $4)
+        ORDER BY {sort_column} {sort_direction}, id ASC
+        LIMIT $5 OFFSET $6
+        "#
+    );
+
+    let products = sqlx::query_as::<_, Product>(&sql)
+        .bind(&search)
+        .bind(category)
+        .bind(min_price)
+        .bind(max_price)
+        .bind(size)
+        .bind(offset)
+        .fetch_all(pool)
+        .await?;
+
+    Ok((products, total))
 }
 
 pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Product>, sqlx::Error> {

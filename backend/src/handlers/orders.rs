@@ -77,7 +77,7 @@ pub async fn get_my_orders(req: HttpRequest, state: web::Data<AppState>) -> Http
         }
     };
 
-    match crate::services::orders::get_orders_by_user(&state.db, user_id).await {
+    match orders::get_orders_by_user(&state.db, user_id).await {
         Ok(orders) => {
             let responce: Vec<_> = orders
                 .into_iter()
@@ -199,7 +199,7 @@ pub async fn update_order_status(state: web::Data<AppState>, path: web::Path<Uui
         })));
     }
     
-    match crate::services::orders::change_order_status(&state.db, order_id, &status).await { 
+    match orders::change_order_status(&state.db, order_id, &status).await { 
         Ok(order) => {Ok(HttpResponse::Ok().json(order))}
         
         Err(UpdateOrderStatusError::NotFound) => {
@@ -247,7 +247,7 @@ pub async fn get_order_details(req: HttpRequest, state: web::Data<AppState>, pat
 
     let order_id = path.into_inner();
 
-    let order = match crate::services::orders::find_order_by_user(&state.db, order_id, user_id).await {
+    let order = match orders::find_order_by_user(&state.db, order_id, user_id).await {
         Ok(Some(order)) => order,
 
         Ok(None) => {

@@ -2,10 +2,10 @@ use crate::models::product::Product;
 use crate::repositories::products as product_repository;
 use sqlx::PgPool;
 use uuid::Uuid;
-use crate::models::product_request::ProductRequest;
+use crate::models::product_request::{ProductRequest, ProductQuery};
 
-pub async fn list_products(pool: &PgPool) -> Result<Vec<Product>, sqlx::Error> {
-    product_repository::find_all(pool).await
+pub async fn list_products(pool: &PgPool, query: &ProductQuery, page: i64, size: i64, sort_by: &str, order: &str) -> Result<(Vec<Product>, i64), sqlx::Error> {
+    product_repository::find_all(pool, query, page, size, sort_by, order).await
 }
 
 pub async fn get_product(pool: &PgPool, id: Uuid) -> Result<Option<Product>, sqlx::Error> {
