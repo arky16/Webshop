@@ -266,3 +266,17 @@ pub async fn find_order_items_for_orders(pool: &PgPool, order_ids: &[Uuid]) -> R
         .fetch_all(pool)
         .await
 }
+
+pub async fn find_order_by_user(pool: &PgPool, order_id: Uuid, user_id: Uuid) -> Result<Option<Order>, sqlx::Error>{
+    sqlx::query_as::<_, Order>(
+        r#"
+            SELECT id, user_id, status, total_amount, created_at, updated_at
+            FROM orders
+            WHERE id = $1 AND user_id = $2
+            "#
+    )
+        .bind(order_id)
+        .bind(user_id)
+        .fetch_optional(pool)
+        .await
+}

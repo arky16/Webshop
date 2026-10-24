@@ -51,6 +51,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         web::scope("/api/orders")
             .route("/checkout", web::post().to(crate::handlers::orders::checkout))
             .route("", web::get().to(crate::handlers::orders::get_my_orders))
+            .route("/{order_id}", web::get().to(crate::handlers::orders::get_order_details))
             .wrap(HttpAuthentication::bearer(crate::auth_middleware::validator))
     );
     

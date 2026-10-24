@@ -223,3 +223,65 @@ pub async fn update_order_status(state: web::Data<AppState>, path: web::Path<Uui
         }
     }
 }
+
+pub async fn get_order_details(req: HttpRequest, state: web::Data<AppState>, path: web::Path<Uuid>) -> HttpResponse{
+    let claims = match req.extensions().get::<Claims>().cloned() {
+        Some(claims) => claims,
+        None => {
+            return HttpResponse::Unauthorized().json(serde_json::json!({
+                "error": "UNAUTHORIZED",
+                "message": "Authentication required"
+            }))
+        }
+    };
+
+    let user_id = match Uuid::parse_str(&claims.sub) {
+        Ok(id) => id,
+        Err(_) => {
+            return HttpResponse::Unauthorized().json(serde_json::json!({
+                "error": "INVALID_TOKEN",
+                "message": "Invalid user identifier in token"
+            }))
+        }
+    };
+
+    let order_id = path.into_inner();
+
+    let order = match crate::services::orders::find_order_by_user(&state.db, order_id, user_id).await {
+        Ok(Some(order)) => order,
+
+        Ok(None) => {
+            return HttpResponse::NotFound().json(serde_json::json!({
+                "error": "ORDER_NOT_FOUND",
+                "message": "Order not found"
+            }))
+        }
+
+        Err(err) => {
+            eprintln!("Failed to fetch order: {err}");
+
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "INTERNAL_SERVER_ERROR",
+                "message": "Order could not be loaded"
+            }))
+        }
+    };
+
+    let items = match crate::repositories::orders::find_order_items(&state.db, order.id).await {
+        Ok(items) => items,
+
+        Err(err) => {
+            eprintln!("Failed to fetch order items: {err}");
+
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "INTERNAL_SERVER_ERROR",
+                "message": "Order items could not be loaded"
+            }))
+        }
+    };
+
+    HttpResponse::Ok().json(serde_json::json!({
+        "order": order,
+        "items": items
+    }))
+}
