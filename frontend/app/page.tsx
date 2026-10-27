@@ -4,6 +4,7 @@ import {useEffect, useState} from "react";
 import api from "@/lib/api";
 import type {Product, ProductListResponse} from "@/types/product";
 import axios from "axios";
+import Link from "next/link";
 
 export default function Home() {
     const [products, setProducts] = useState<Product[]>([]);
@@ -370,7 +371,12 @@ export default function Home() {
                                 </div>
 
                                 <h2 className="text-xl font-semibold text-gray-900">
-                                    {product.name}
+                                    <Link
+                                        href={`/products/${product.id}`}
+                                        className="transition hover:text-blue-700"
+                                    >
+                                        {product.name}
+                                    </Link>
                                 </h2>
 
                                 <p className="mt-3 min-h-12 text-sm leading-6 text-gray-600">
