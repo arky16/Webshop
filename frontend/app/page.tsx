@@ -166,7 +166,7 @@ export default function Home() {
             </form>
 
 
-            <aside className="mb-8 space-y-4 lg:fixed lg:left-0 lg:top-0 lg:mb-0 lg:h-screen lg:w-64 lg:overflow-y-auto lg:border-r lg:border-gray-200 lg:bg-white lg:p-5">
+            <aside className="mb-8 space-y-4 border-b border-gray-200 bg-white p-5 lg:absolute lg:left-100 lg:top-65 lg:mb-0 lg:w-64 lg:border-b-0 lg:border-r">
                 <form
                     className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 lg:rounded-none lg:border-0 lg:p-0"
                     onSubmit={(event) => {
