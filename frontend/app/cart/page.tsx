@@ -5,6 +5,7 @@ import Link from "next/link";
 import {useAuth} from "@/context/AuthContext";
 import {getCart, removeFromCart} from "@/lib/cart";
 import type {CartItem} from "@/types/cart";
+import {useRouter} from "next/navigation";
 
 export default function CartPage(){
     const {status} = useAuth();
@@ -13,6 +14,7 @@ export default function CartPage(){
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [removingId, setRemovingID] = useState<string | null>(null);
+    const router = useRouter();
 
     const loadCart = useCallback(async () => {
         setLoading(true);
@@ -159,8 +161,8 @@ export default function CartPage(){
 
                         <button
                             type="button"
-                            disabled
-                            className="cursor-not-allowed rounded-lg bg-gray-300 px-6 py-3 font-medium text-gray-600"
+                            onClick={() => router.push("/checkout")}
+                            className="rounded bg-blue-700 px-6 py-3 text-white"
                         >
                             Zur Kasse
                         </button>

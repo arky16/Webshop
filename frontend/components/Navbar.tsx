@@ -61,18 +61,26 @@ export default function Navbar() {
                     <Link
                         href="/cart"
                         aria-label={`Warenkorb, ${itemCount} Artikel`}
-                        className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-blue-700"
+                        className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-black"
                     >
                         <span>Warenkorb</span>
 
                         <span
                             aria-hidden="true"
-                            className="inline-flex min-w-6 h-6 items-center justify-center rounded-full bg-blue-600 px-1.5 text-xs font-bold text-white"
+                            className="inline-flex min-w-6 h-6 items-center justify-center rounded-full px-1.5 text-xs font-bold text-white"
                         >
                             {itemCount}
                         </span>
                     </Link>
 
+                    {status === "authenticated" && (
+                        <Link
+                            href="/orders"
+                            className="rounded-lg bg-blue-700 px-4.5 py-2.5 text-sm font-medium text-white transition hover:bg-black"
+                        >
+                            Bestellungen
+                        </Link>
+                    )}
                 </div>
             </nav>
         </header>

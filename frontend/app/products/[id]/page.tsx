@@ -137,13 +137,6 @@ export default function ProductDetailPage() {
 
     return (
         <main className="mx-auto min-h-screen max-w-5xl px-6 py-10">
-            <Link
-                href="/"
-                className="inline-block text-sm font-medium text-blue-700 hover:underline"
-            >
-                Zurück zum Shop
-            </Link>
-
             {loading ? (
                 <p role="status" className="py-16 text-gray-600">
                     Produkt wird geladen...
@@ -162,7 +155,7 @@ export default function ProductDetailPage() {
                     </Link>
                 </div>
             ) : product ? (
-                <article className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-10">
+                <article className="mt-8 mb-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-10">
                     <div className="mb-6 flex flex-wrap items-center gap-3">
             <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-medium text-blue-700">
               {product.category ?? "Allgemein"}
@@ -248,6 +241,12 @@ export default function ProductDetailPage() {
                     )}
                 </article>
             ) : null}
+            <Link
+                href="/"
+                className="inline-block rounded border px-4 py-2 font-medium hover:bg-blue-700"
+            >
+                Zurück zum Shop
+            </Link>
         </main>
     );
 }

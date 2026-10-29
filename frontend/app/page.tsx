@@ -164,10 +164,6 @@ export default function Home() {
     return (
         <main className="mx-auto min-h-screen max-w-7xl px-6 py-10">
             <header className="mb-10">
-                <p className="mb-2 text-sm font-medium uppercase tracking-widest text-blue-600">
-                    Webshop
-                </p>
-
                 <h1 className="text-4xl font-bold tracking-tight">
                     Unsere Produkte
                 </h1>
