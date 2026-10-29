@@ -5,6 +5,9 @@ import api from "@/lib/api";
 import type {Product, ProductListResponse} from "@/types/product";
 import axios from "axios";
 import Link from "next/link";
+import {useRouter} from "next/navigation";
+import {addToCart} from "@/lib/cart";
+import {useAuth} from "@/context/AuthContext";
 
 export default function Home() {
     const [products, setProducts] = useState<Product[]>([]);
@@ -25,6 +28,11 @@ export default function Home() {
     const [orderInput, setOrderInput] = useState("desc");
     const [sortBy, setSortBy] = useState("created_at");
     const [order, setOrder] = useState("desc");
+    const router = useRouter();
+    const {status} = useAuth();
+    const [addingProductId, setAddingProductId] = useState<string|null>(null);
+    const [cartMessage, setCartMessage] = useState("");
+    const [cartError, setCartError] = useState("");
 
     const pageSize = 10;
 
@@ -105,6 +113,53 @@ export default function Home() {
             currency: "EUR"
         }).format(value);
     }
+
+    async function handleAddToCart(productId: string) {
+        if (status === "loading" || addingProductId !== null) {
+            return;
+        }
+
+        setCartMessage("");
+        setCartError("");
+
+        if (status === "anonymous") {
+            router.push("/login");
+            return;
+        }
+
+        setAddingProductId(productId);
+
+        try {
+            await addToCart(productId, 1);
+
+            setCartMessage("Produkt wurde zum Warenkorb hinzugefügt.");
+        } catch (error: unknown) {
+            if (axios.isAxiosError(error)) {
+                const statusCode = error.response?.status;
+                const errorCode = error.response?.data?.error;
+
+                if (statusCode === 401) {
+                    setCartError("Bitte melde dich erneut an.");
+                } else if (
+                    statusCode === 409 ||
+                    errorCode === "PRODUCT_UNAVAILABLE"
+                ) {
+                    setCartError(
+                        "Produkt nicht verfügbar oder Lagerbestand unzureichend."
+                    );
+                } else if (statusCode === 400) {
+                    setCartError("Die Anfrage ist ungültig.");
+                } else {
+                    setCartError("Produkt konnte nicht hinzugefügt werden.");
+                }
+            } else {
+                setCartError("Ein unerwarteter Fehler ist aufgetreten.");
+            }
+        } finally {
+            setAddingProductId(null);
+        }
+    }
+
 
     return (
         <main className="mx-auto min-h-screen max-w-7xl px-6 py-10">
@@ -396,13 +451,48 @@ export default function Home() {
 
                                     <button
                                         type="button"
-                                        disabled={product.stock <= 0}
+                                        disabled={
+                                            product.stock <= 0 ||
+                                            !product.active ||
+                                            addingProductId !== null ||
+                                            status === "loading"
+                                        }
+                                        onClick={() => void handleAddToCart(product.id)}
                                         className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
-                                        onClick={() => {alert("Den Warenkorb ist noch nicht fertig");}}
                                     >
-                                        Zum Warenkorb
+                                        {addingProductId === product.id
+                                            ? "Wird hinzugefügt..."
+                                            : "Zum Warenkorb"}
                                     </button>
                                 </div>
+                                {cartMessage && (
+                                    <div className="my-4 rounded-lg border border-green-200 bg-green-50 p-4">
+                                        <p role="status" className="text-sm text-green-800">
+                                            {cartMessage}
+                                        </p>
+
+                                        <Link
+                                            href="/cart"
+                                            className="mt-2 inline-block font-medium text-green-800 underline"
+                                        >
+                                            Zum Warenkorb
+                                        </Link>
+                                    </div>
+                                )}
+
+                                {cartError && (
+                                    <p role="alert" className="my-4 text-sm text-red-700">
+                                        {cartError}
+                                        {cartError.includes("erneut anmelden") && (
+                                            <>
+                                                {" "}
+                                                <Link href="/login" className="underline">
+                                                    Zum Login
+                                                </Link>
+                                            </>
+                                        )}
+                                    </p>
+                                )}
                             </article>
                         ))}
                     </section>

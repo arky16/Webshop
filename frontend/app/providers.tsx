@@ -1,12 +1,15 @@
 "use client"
 
-import type {ReactNode} from "react";
-import {AuthProvider} from "@/context/AuthContext";
+import type { ReactNode } from "react";
+import { AuthProvider } from "@/context/AuthContext";
+import { CartProvider } from "@/context/CartContext";
 
-interface ProvidersProps{
-    children: ReactNode;
-}
-
-export default function Providers({children}: ProvidersProps) {
-    return <AuthProvider>{children}</AuthProvider>;
+export default function Providers({children}: {children: ReactNode}){
+    return (
+        <AuthProvider>
+            <CartProvider>
+                {children}
+            </CartProvider>
+        </AuthProvider>
+    );
 }
