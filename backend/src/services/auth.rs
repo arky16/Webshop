@@ -12,6 +12,26 @@ use jsonwebtoken::{encode, EncodingKey, Header};
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::models::claims::Claims;
 
+fn hash_password(password: &str) -> Result<String, ()> {
+    let salt = SaltString::generate(&mut OsRng);
+
+    Argon2::default()
+        .hash_password(password.as_bytes(), &salt)
+        .map(|hash| hash.to_string())
+        .map_err(|_| ())
+}
+
+fn verify_password(password: &str, password_hash: &str) -> bool {
+    let parsed_hash = match PasswordHash::new(password_hash) {
+        Ok(hash) => hash,
+        Err(_) => return false,
+    };
+
+    Argon2::default()
+        .verify_password(password.as_bytes(), &parsed_hash)
+        .is_ok()
+}
+
 #[derive(Debug)]
 pub enum RegisterError{
     EmailAlreadyExists,
@@ -29,12 +49,8 @@ pub async fn register_user(pool: &PgPool, email: &str, password: &str) -> Result
         return Err(RegisterError::EmailAlreadyExists);
     }
 
-    let salt = SaltString::generate(&mut OsRng);
-
-    let password_hash = Argon2::default()
-        .hash_password(password.as_bytes(), &salt)
-        .map_err(|_| RegisterError::PasswordHashing)?
-        .to_string();
+    let password_hash = hash_password(password)
+        .map_err(|_| RegisterError::PasswordHashing)?;
 
     match auth_repository::create_user(pool, &email, &password_hash).await {
         Ok(user) => Ok(user),
@@ -68,12 +84,9 @@ pub async fn login_user(pool: &PgPool, email: &str, password: &str)->Result<(Use
         .map_err(|_| LoginError::InvalidCredentials)?
         .ok_or(LoginError::InvalidCredentials)?;
 
-    let parsed_hash = PasswordHash::new(&user.password_hash)
-        .map_err(|_| LoginError::InvalidCredentials)?;
-
-    Argon2::default()
-        .verify_password(password.as_bytes(), &parsed_hash)
-        .map_err(|_| LoginError::InvalidCredentials)?;
+    if !verify_password(password, &user.password_hash) {
+        return Err(LoginError::InvalidCredentials);
+    }
 
     let secret = std::env::var("JWT_SECRET")
         .map_err(|_| LoginError::Configuration)?;
@@ -92,6 +105,56 @@ pub async fn login_user(pool: &PgPool, email: &str, password: &str)->Result<(Use
     let token = encode(&Header::default(), &claims, &EncodingKey::from_secret(secret.as_bytes())).map_err(|_| LoginError::TokenCreation)?;
 
     Ok((user, token))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{hash_password, verify_password};
+
+    #[test]
+    fn password_is_hashed_successfully() {
+        let password = "MySecurePassword123";
+
+        let hash = hash_password(password).unwrap();
+
+        assert_ne!(hash, password);
+    }
+
+    #[test]
+    fn correct_password_is_verified() {
+        let password = "MySecurePassword123";
+
+        let hash = hash_password(password).unwrap();
+
+        assert!(verify_password(password, &hash));
+    }
+
+    #[test]
+    fn incorrect_password_is_rejected() {
+        let password = "MySecurePassword123";
+
+        let hash = hash_password(password).unwrap();
+
+        assert!(!verify_password("WrongPassword123", &hash));
+    }
+
+    #[test]
+    fn invalid_hash_is_rejected() {
+        assert!(!verify_password("password123", "invalid-hash"));
+    }
+
+    #[test]
+    fn different_hashes_are_generated_for_same_password() {
+        let password = "MySecurePassword123";
+
+        let hash1 = hash_password(password).unwrap();
+        let hash2 = hash_password(password).unwrap();
+
+        assert_ne!(hash1, hash2);
+
+        assert!(verify_password(password, &hash1));
+        assert!(verify_password(password, &hash2));
+    }
 }
 
 

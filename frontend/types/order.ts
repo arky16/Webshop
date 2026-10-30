@@ -24,3 +24,21 @@ export interface OrderWithItems {
     order: Order;
     items: OrderItem[];
 }
+
+export interface AdminOrdersResponse {
+    orders: OrderWithItems[];
+    pagination: {
+        page: number;
+        size: number;
+        total: number;
+        total_pages: number;
+    };
+}
+
+export type OrderStatus =
+    | "PENDING"
+    | "PAID"
+    | "PROCESSING"
+    | "SHIPPED"
+    | "COMPLETED"
+    | "CANCELLED";

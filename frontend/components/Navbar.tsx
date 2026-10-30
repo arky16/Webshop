@@ -81,6 +81,15 @@ export default function Navbar() {
                             Bestellungen
                         </Link>
                     )}
+
+                    {status === "authenticated" && user?.role === "ADMIN" && (
+                        <Link
+                            href="/admin/orders"
+                            className="rounded-lg bg-blue-700 px-4.5 py-2.5 text-sm font-medium text-white transition hover:bg-black"
+                        >
+                            Admin-Bestellungen
+                        </Link>
+                    )}
                 </div>
             </nav>
         </header>

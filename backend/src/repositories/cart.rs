@@ -78,3 +78,146 @@ pub async fn remove_item(pool: &PgPool, user_id: Uuid, product_id: Uuid) -> Resu
     
     Ok(result.rows_affected() > 0)
 }
+
+
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+    use sqlx::postgres::PgPoolOptions;
+    use uuid::Uuid;
+
+    #[tokio::test]
+    async fn cart_repository_integration_test() {
+        dotenvy::dotenv().ok();
+
+        let database_url = std::env::var("TEST_DATABASE_URL")
+            .expect("TEST_DATABASE_URL ist nicht gesetzt");
+
+        let pool = PgPoolOptions::new()
+            .max_connections(1)
+            .connect(&database_url)
+            .await
+            .expect("Verbindung zur Testdatenbank fehlgeschlagen");
+
+        sqlx::migrate!("./migrations")
+            .run(&pool)
+            .await
+            .expect("Migrationen fehlgeschlagen");
+
+        let user1_id = Uuid::new_v4();
+        let user2_id = Uuid::new_v4();
+        let product_id = Uuid::new_v4();
+
+        for (id, email) in [
+            (user1_id, format!("test-{}@example.com", user1_id)),
+            (user2_id, format!("test-{}@example.com", user2_id)),
+        ] {
+            sqlx::query(
+                r#"
+                INSERT INTO users (id, email, password_hash)
+                VALUES ($1, $2, 'test-hash')
+                "#
+            )
+                .bind(id)
+                .bind(email)
+                .execute(&pool)
+                .await
+                .expect("Testbenutzer konnte nicht angelegt werden");
+        }
+
+        sqlx::query(
+            r#"
+            INSERT INTO products
+                (id, name, description, price, stock, category, active)
+            VALUES
+                ($1, 'Integration Test Product', 'Test description',
+                 19.99, 5, 'Test', TRUE)
+            "#
+        )
+            .bind(product_id)
+            .execute(&pool)
+            .await
+            .expect("Testprodukt konnte nicht angelegt werden");
+
+        let first_add = add_item(&pool, user1_id, product_id, 2)
+            .await
+            .expect("Erstes Hinzufügen fehlgeschlagen")
+            .expect("Produkt wurde nicht hinzugefügt");
+
+        assert_eq!(first_add.quantity, 2);
+
+        let second_add = add_item(&pool, user1_id, product_id, 3)
+            .await
+            .expect("Zweites Hinzufügen fehlgeschlagen")
+            .expect("Produktmenge wurde nicht erhöht");
+
+        assert_eq!(second_add.quantity, 5);
+
+        let overflow = add_item(&pool, user1_id, product_id, 1)
+            .await
+            .expect("Datenbankabfrage fehlgeschlagen");
+
+        assert!(overflow.is_none());
+
+        let user2_add = add_item(&pool, user2_id, product_id, 1)
+            .await
+            .expect("Hinzufügen für zweiten Benutzer fehlgeschlagen")
+            .expect("Produkt für zweiten Benutzer nicht hinzugefügt");
+
+        assert_eq!(user2_add.quantity, 1);
+
+        let user1_cart = find_all(&pool, user1_id)
+            .await
+            .expect("Warenkorb von Benutzer 1 konnte nicht geladen werden");
+
+        let user2_cart = find_all(&pool, user2_id)
+            .await
+            .expect("Warenkorb von Benutzer 2 konnte nicht geladen werden");
+
+        assert_eq!(user1_cart.len(), 1);
+        assert_eq!(user1_cart[0].quantity, 5);
+
+        assert_eq!(user2_cart.len(), 1);
+        assert_eq!(user2_cart[0].quantity, 1);
+
+        let removed = remove_item(&pool, user1_id, product_id)
+            .await
+            .expect("Entfernen fehlgeschlagen");
+
+        assert!(removed);
+
+        let user1_cart_after_removal = find_all(&pool, user1_id)
+            .await
+            .expect("Warenkorb konnte nicht erneut geladen werden");
+
+        assert!(user1_cart_after_removal.is_empty());
+
+        let user2_cart_after_removal = find_all(&pool, user2_id)
+            .await
+            .expect("Warenkorb von User 2 konnte nicht geladen werden");
+
+        assert_eq!(user2_cart_after_removal.len(), 1);
+
+        sqlx::query("DELETE FROM cart_items WHERE user_id IN ($1, $2)")
+            .bind(user1_id)
+            .bind(user2_id)
+            .execute(&pool)
+            .await
+            .expect("Cart-Testdaten konnten nicht gelöscht werden");
+
+        sqlx::query("DELETE FROM products WHERE id = $1")
+            .bind(product_id)
+            .execute(&pool)
+            .await
+            .expect("Testprodukt konnte nicht gelöscht werden");
+
+        sqlx::query("DELETE FROM users WHERE id IN ($1, $2)")
+            .bind(user1_id)
+            .bind(user2_id)
+            .execute(&pool)
+            .await
+            .expect("Testbenutzer konnten nicht gelöscht werden");
+
+        pool.close().await;
+    }
+}

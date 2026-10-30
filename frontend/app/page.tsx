@@ -31,8 +31,8 @@ export default function Home() {
     const router = useRouter();
     const {status} = useAuth();
     const [addingProductId, setAddingProductId] = useState<string|null>(null);
-    const [cartMessage, setCartMessage] = useState("");
-    const [cartError, setCartError] = useState("");
+    const [cartMessage, setCartMessage] = useState<string | null>(null);
+    const [cartError, setCartError] = useState<string|null>(null);
 
     const pageSize = 10;
 
@@ -119,8 +119,8 @@ export default function Home() {
             return;
         }
 
-        setCartMessage("");
-        setCartError("");
+        setCartMessage(null);
+        setCartError(null);
 
         if (status === "anonymous") {
             router.push("/login");
@@ -132,28 +132,26 @@ export default function Home() {
         try {
             await addToCart(productId, 1);
 
-            setCartMessage("Produkt wurde zum Warenkorb hinzugefügt.");
+            setCartMessage(productId);
         } catch (error: unknown) {
             if (axios.isAxiosError(error)) {
                 const statusCode = error.response?.status;
                 const errorCode = error.response?.data?.error;
 
                 if (statusCode === 401) {
-                    setCartError("Bitte melde dich erneut an.");
+                    setCartError(productId);
                 } else if (
                     statusCode === 409 ||
                     errorCode === "PRODUCT_UNAVAILABLE"
                 ) {
-                    setCartError(
-                        "Produkt nicht verfügbar oder Lagerbestand unzureichend."
-                    );
+                    setCartError(productId);
                 } else if (statusCode === 400) {
-                    setCartError("Die Anfrage ist ungültig.");
+                    setCartError(productId);
                 } else {
-                    setCartError("Produkt konnte nicht hinzugefügt werden.");
+                    setCartError(productId);
                 }
             } else {
-                setCartError("Ein unerwarteter Fehler ist aufgetreten.");
+                setCartError(productId);
             }
         } finally {
             setAddingProductId(null);
@@ -461,10 +459,10 @@ export default function Home() {
                                             : "Zum Warenkorb"}
                                     </button>
                                 </div>
-                                {cartMessage && (
+                                {cartMessage === product.id && (
                                     <div className="my-4 rounded-lg border border-green-200 bg-green-50 p-4">
                                         <p role="status" className="text-sm text-green-800">
-                                            {cartMessage}
+                                            Produkt wurde zum Warenkorb hinzugefügt.
                                         </p>
 
                                         <Link
@@ -475,18 +473,12 @@ export default function Home() {
                                         </Link>
                                     </div>
                                 )}
-
-                                {cartError && (
+                                {cartError === product.id && (
                                     <p role="alert" className="my-4 text-sm text-red-700">
-                                        {cartError}
-                                        {cartError.includes("erneut anmelden") && (
-                                            <>
-                                                {" "}
-                                                <Link href="/login" className="underline">
-                                                    Zum Login
-                                                </Link>
-                                            </>
-                                        )}
+                                        Produkt konnte nicht zum Warenkorb hinzugefügt werden.
+                                        <Link href="/login" className="ml-2 underline">
+                                            Zum Login
+                                        </Link>
                                     </p>
                                 )}
                             </article>

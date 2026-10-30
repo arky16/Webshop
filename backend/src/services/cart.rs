@@ -10,6 +10,14 @@ pub enum CartError{
     Database(sqlx::Error)
 }
 
+fn validate_quantity(quantity: i32) -> Result<(), CartError> {
+    if quantity <= 0 {
+        return Err(CartError::InvalidQuantity);
+    }
+
+    Ok(())
+}
+
 pub async fn get_cart(pool: &PgPool, user_id: Uuid) -> Result<Vec<CartItemDetails>, CartError>{
     cart_repository::find_all(pool, user_id)
         .await
@@ -17,9 +25,7 @@ pub async fn get_cart(pool: &PgPool, user_id: Uuid) -> Result<Vec<CartItemDetail
 }
 
 pub async fn add_to_cart(pool: &PgPool, user_id: Uuid, product_id: Uuid, quantity: i32) -> Result<CartItemDetails, CartError>{
-    if quantity <= 0 {
-        return Err(CartError::InvalidQuantity);
-    }
+    validate_quantity(quantity)?;
 
     match cart_repository::add_item(pool, user_id, product_id, quantity)
         .await
@@ -38,5 +44,38 @@ pub async fn remove_from_cart(pool: &PgPool, user_id: Uuid, product_id: Uuid) ->
         Ok(())
     } else {
         Err(CartError::ProductUnavailable)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CartError, validate_quantity};
+
+    #[test]
+    fn positive_quantity_is_valid() {
+        assert!(validate_quantity(1).is_ok());
+        assert!(validate_quantity(5).is_ok());
+        assert!(validate_quantity(100).is_ok());
+    }
+
+    #[test]
+    fn zero_quantity_is_invalid() {
+        assert!(matches!(
+            validate_quantity(0),
+            Err(CartError::InvalidQuantity)
+        ));
+    }
+
+    #[test]
+    fn negative_quantity_is_invalid() {
+        assert!(matches!(
+            validate_quantity(-1),
+            Err(CartError::InvalidQuantity)
+        ));
+
+        assert!(matches!(
+            validate_quantity(-10),
+            Err(CartError::InvalidQuantity)
+        ));
     }
 }
