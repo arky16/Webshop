@@ -2,11 +2,25 @@ use actix_web::{test, web, App};
 use sqlx::postgres::PgPoolOptions;
 use std::env;
 use uuid::Uuid;
+use sqlx::postgres::PgPool;
 
 use backend::{
     routes,
     state::AppState,
 };
+
+fn create_test_app_state(pool: PgPool) -> web::Data<AppState> {
+    let redis_url = env::var("REDIS_URL")
+        .unwrap_or_else(|_| "redis://127.0.0.1:6379/".to_string());
+
+    let redis_client = redis::Client::open(redis_url)
+        .expect("Could not create Redis client");
+
+    web::Data::new(AppState {
+        db: pool,
+        redis: redis_client,
+    })
+}
 
 #[actix_web::test]
 async fn auth_register_and_login_integration_test() {
@@ -31,7 +45,7 @@ async fn auth_register_and_login_integration_test() {
 
     let app = test::init_service(
         App::new()
-            .app_data(web::Data::new(AppState { db: pool.clone() }))
+            .app_data(create_test_app_state(pool.clone()))
             .configure(routes::configure),
     )
         .await;
@@ -126,7 +140,7 @@ async fn auth_error_cases_integration_test() {
 
     let app = test::init_service(
         App::new()
-            .app_data(web::Data::new(AppState { db: pool.clone() }))
+            .app_data(create_test_app_state(pool.clone()))
             .configure(routes::configure),
     )
         .await;

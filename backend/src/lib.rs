@@ -5,6 +5,7 @@ pub mod routes;
 pub mod services;
 pub mod state;
 pub mod auth_middleware;
+pub mod rate_limit;
 
 use actix_web::{web, App};
 use state::AppState;

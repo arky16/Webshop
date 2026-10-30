@@ -6,7 +6,13 @@ use crate::services::auth::{self, LoginError, RegisterError};
 use crate::state::AppState;
 use crate::models::claims::Claims;
 use actix_web::{HttpRequest, HttpMessage};
-
+use crate::rate_limit::{
+    is_rate_limited,
+    is_login_rate_limited,
+    record_failed_attempt,
+    reset_rate_limit,
+    rate_limit_key,
+};
 
 #[derive(Serialize)]
 struct RegisterResponse{
@@ -16,7 +22,26 @@ struct RegisterResponse{
 }
 
 #[post("/register")]
-pub async fn register(state: web::Data<AppState>, body: web::Json<RegisterRequest>) -> HttpResponse{
+pub async fn register(state: web::Data<AppState>, body: web::Json<RegisterRequest>, req: HttpRequest) -> HttpResponse{
+
+    let ip = req.peer_addr()
+        .map(|addr| addr.ip().to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let key = rate_limit_key(&ip, "register");
+
+    match is_rate_limited(&state, &key, 5, 60).await {
+        Ok(true) => {
+            return HttpResponse::TooManyRequests().json(serde_json::json!({
+            "error": "RATE_LIMIT_EXCEEDED",
+            "message": "Too many registration attempts. Please try again later."
+        }));
+        }
+        Ok(false) => {}
+        Err(error) => {
+            eprintln!("Registration rate limit failed: {error}");
+        }
+    }
 
     if let Err(errors) = body.validate() {
         return HttpResponse::BadRequest().json(serde_json::json!({
@@ -73,9 +98,30 @@ struct LoginResponse{
     user: LoginUserResponse
 }
 
+
 #[post("/login")]
-pub async fn login(state: web::Data<AppState>, body: web::Json<LoginRequest>)-> HttpResponse{
-    if let Err(errors) = body.validate(){
+pub async fn login(state: web::Data<AppState>, body: web::Json<LoginRequest>, req: HttpRequest) -> HttpResponse {
+
+    let ip = req.peer_addr()
+        .map(|addr| addr.ip().to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let key = rate_limit_key(&ip, "login");
+
+    match is_login_rate_limited(&state, &key, 5).await {
+        Ok(true) => {
+            return HttpResponse::TooManyRequests().json(serde_json::json!({
+                "error": "RATE_LIMIT_EXCEEDED",
+                "message": "Too many failed login attempts. Please try again later."
+            }));
+        }
+        Ok(false) => {}
+        Err(error) => {
+            eprintln!("Login rate limit check failed: {error}");
+        }
+    }
+
+    if let Err(errors) = body.validate() {
         return HttpResponse::BadRequest().json(serde_json::json!({
             "error": "VALIDATION_ERROR",
             "message": "Please check your input",
@@ -83,13 +129,19 @@ pub async fn login(state: web::Data<AppState>, body: web::Json<LoginRequest>)-> 
         }));
     }
 
-    match auth::login_user(&state.db, &body.email, &body.password).await{
+    match auth::login_user(&state.db, &body.email, &body.password).await {
         Ok((user, token)) => {
-            HttpResponse::Ok().json(LoginResponse{
+
+            // Reset failed attempts after successful login.
+            if let Err(error) = reset_rate_limit(&state, &key).await {
+                eprintln!("Could not reset login rate limit: {error}");
+            }
+
+            HttpResponse::Ok().json(LoginResponse {
                 access_token: token,
                 token_type: "Bearer",
                 expires_in: 3600,
-                user: LoginUserResponse{
+                user: LoginUserResponse {
                     id: user.id,
                     email: user.email,
                     role: user.role
@@ -97,7 +149,12 @@ pub async fn login(state: web::Data<AppState>, body: web::Json<LoginRequest>)-> 
             })
         }
 
-        Err(LoginError::InvalidCredentials)=>{
+        Err(LoginError::InvalidCredentials) => {
+
+            if let Err(error) = record_failed_attempt(&state, &key, 60).await {
+                eprintln!("Could not record failed login attempt: {error}");
+            }
+
             HttpResponse::Unauthorized().json(serde_json::json!({
                 "error": "INVALID_CREDENTIALS",
                 "message": "Email or password is incorrect"
@@ -112,6 +169,7 @@ pub async fn login(state: web::Data<AppState>, body: web::Json<LoginRequest>)-> 
         }
     }
 }
+
 
 
 #[derive(Serialize)]
