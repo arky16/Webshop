@@ -112,7 +112,7 @@ export default function OrdersPage() {
                     Meine Bestellungen
                 </h1>
 
-                <p className="mt-2 text-gray-600">
+                <p className="mt-2 text-gray-50">
                     Hier findest du eine Übersicht deiner bisherigen Bestellungen.
                 </p>
             </div>
@@ -159,7 +159,7 @@ export default function OrdersPage() {
                     {orders.map(({ order, items }) => (
                         <article
                             key={order.id}
-                            className="rounded-lg border p-5"
+                            className="rounded-lg border p-5 bg-gray-900"
                         >
                             <div className="flex flex-col justify-between gap-4 sm:flex-row">
                                 <div>

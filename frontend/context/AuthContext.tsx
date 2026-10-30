@@ -1,6 +1,6 @@
 "use client"
 
-import {createContext, useCallback, useContext, useState, useEffect, type FormEvent, ReactNode} from "react";
+import {createContext, useCallback, useContext, useState, useEffect, ReactNode} from "react";
 import axios from "axios";
 import api from "@/lib/api";
 import type {AuthUser, LoginResponse} from "@/types/auth";

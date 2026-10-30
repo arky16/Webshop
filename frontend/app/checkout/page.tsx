@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import api from "@/lib/api";
 import { getCart } from "@/lib/cart";
 import { checkout } from "@/lib/orders";
 import { useAuth } from "@/context/AuthContext";

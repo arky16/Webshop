@@ -31,12 +31,39 @@ export default function CartPage(){
     }, []);
 
     useEffect(() => {
-        if (status === "authenticated") {
-            void loadCart();
-        } else if (status === "anonymous"){
-            setLoading(false);
+        if (status !== "authenticated") {
+            return;
         }
-    }, [status, loadCart]);
+
+        let cancelled = false;
+
+        async function fetchCart() {
+            setLoading(true);
+            setError("");
+
+            try {
+                const data = await getCart();
+
+                if (!cancelled) {
+                    setItems(data);
+                }
+            } catch {
+                if (!cancelled) {
+                    setError("Der Warenkorb konnte nicht geladen werden");
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
+        }
+
+        void fetchCart();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [status]);
 
     async function handleRemove(productId: string) {
         setRemovingID(productId);
@@ -95,7 +122,7 @@ export default function CartPage(){
                 </div>
             ) : items.length === 0 ? (
                 <div>
-                    <p className="mb-4 text-gray-600">Dein Warenkorb ist noch leer.</p>
+                    <p className="mb-4 text-gray-50">Dein Warenkorb ist noch leer.</p>
                     <Link
                         href="/"
                         className="inline-block rounded-lg bg-gray-900 px-5 py-3 text-white hover:bg-blue-700"
@@ -113,7 +140,7 @@ export default function CartPage(){
                         {items.map((item) => (
                             <article
                                 key={item.id}
-                                className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"
+                                className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between bg-gray-900"
                             >
                                 <div className="min-w-0">
                                     <Link

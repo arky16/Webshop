@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { getOrderDetails } from "@/lib/orders";
@@ -45,7 +45,7 @@ function getStatusClass(status: string): string {
     return classes[status] ?? "bg-gray-100 text-gray-800";
 }
 
-export default function OrderDetailsPage() {
+function OrderDetailsContent() {
     const params = useParams<{ id: string }>();
     const router = useRouter();
     const { status } = useAuth();
@@ -149,7 +149,7 @@ export default function OrderDetailsPage() {
                     href="/orders"
                     className="text-sm text-gray-600 hover:underline"
                 >
-                    ← Zurück zu meinen Bestellungen
+                    Zurück zu meinen Bestellungen
                 </Link>
 
                 <h1 className="mt-4 text-3xl font-bold">
@@ -157,8 +157,8 @@ export default function OrderDetailsPage() {
                 </h1>
             </div>
 
-            <section className="mb-6 rounded-lg border p-6">
-                <div className="flex flex-col justify-between gap-4 sm:flex-row">
+            <section className="mb-6 rounded-lg border p-6 bg-gray-900">
+                <div className="flex flex-col justify-between gap-4 sm:flex-row ">
                     <div>
                         <p className="text-sm text-gray-500">
                             Bestellnummer
@@ -197,7 +197,7 @@ export default function OrderDetailsPage() {
                 </div>
             </section>
 
-            <section className="rounded-lg border p-6">
+            <section className="rounded-lg border p-6 bg-gray-900">
                 <h2 className="mb-5 text-xl font-semibold">
                     Bestellte Produkte
                 </h2>
@@ -254,5 +254,21 @@ export default function OrderDetailsPage() {
                 </Link>
             </div>
         </main>
+    );
+}
+
+export default function OrderDetailsPage() {
+    return (
+        <Suspense
+            fallback={
+                <main className="mx-auto max-w-4xl p-6">
+                    <p role="status">
+                        Bestelldetails werden geladen...
+                    </p>
+                </main>
+            }
+        >
+            <OrderDetailsContent />
+        </Suspense>
     );
 }

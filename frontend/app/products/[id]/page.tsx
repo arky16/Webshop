@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import axios from "axios";
 import api from "@/lib/api";
@@ -9,7 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import type { Product } from "@/types/product";
 import { useParams, useRouter } from "next/navigation";
 
-export default function ProductDetailPage() {
+function ProductDetailContent() {
     const [product, setProduct] = useState<Product | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -248,5 +248,21 @@ export default function ProductDetailPage() {
                 Zurück zum Shop
             </Link>
         </main>
+    );
+}
+
+export default function ProductDetailPage() {
+    return (
+        <Suspense
+            fallback={
+                <main className="mx-auto min-h-screen max-w-5xl px-6 py-10">
+                    <p role="status" className="py-16 text-gray-600">
+                        Produkt wird geladen...
+                    </p>
+                </main>
+            }
+        >
+            <ProductDetailContent />
+        </Suspense>
     );
 }

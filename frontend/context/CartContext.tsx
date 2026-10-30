@@ -26,15 +26,34 @@ export function CartProvider({children}: {children: ReactNode}){
     }, []);
 
     useEffect(() => {
-        if (status === "anonymous"){
-            setItemCount(0);
+        if (status !== "authenticated") {
             return;
         }
 
-        if (status === "authenticated") {
-            void refreshCartCount();
+        let cancelled = false;
+
+        async function loadCartCount() {
+            try {
+                const items = await getCart();
+
+                if (!cancelled) {
+                    const count = items.reduce(
+                        (sum, item) => sum + item.quantity,
+                        0
+                    );
+
+                    setItemCount(count);
+                }
+            } catch {
+            }
         }
-    }, [status, refreshCartCount]);
+
+        void loadCartCount();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [status]);
 
     useEffect(() => {
         function handleCartUpdated() {
@@ -49,7 +68,12 @@ export function CartProvider({children}: {children: ReactNode}){
     }, [refreshCartCount]);
 
     return (
-        <CartContext.Provider value={{itemCount, refreshCartCount}}>
+        <CartContext.Provider
+            value={{
+                itemCount: status === "anonymous" ? 0 : itemCount,
+                refreshCartCount,
+            }}
+        >
             {children}
         </CartContext.Provider>
     );

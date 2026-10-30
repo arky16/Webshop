@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect, useState} from "react";
+import {useEffect, useState, Suspense} from "react";
 import {useSearchParams, useRouter} from "next/navigation";
 import {getOrderDetails} from "@/lib/orders";
 import type {OrderWithItems} from "@/types/order";
@@ -13,7 +13,7 @@ function formatPrice(price: string): string {
     }).format(Number(price));
 }
 
-export default function OrderSuccessPage() {
+function OrderSuccessContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const {status} = useAuth();
@@ -25,18 +25,11 @@ export default function OrderSuccessPage() {
     const [error, setError] = useState("");
 
     useEffect(() => {
-        if (status === "loading") return;
-
-        if (status === "anonymous") {
-            router.replace("/login");
+        if (status === "loading" || status === "anonymous" || !orderId) {
             return;
         }
 
-        if (!orderId) {
-            setError("Es wurde keine Bestellnummer angegeben.");
-            setLoading(false);
-            return;
-        }
+        const currentOrderId = orderId;
 
         let cancelled = false;
 
@@ -45,7 +38,7 @@ export default function OrderSuccessPage() {
                 setLoading(true);
                 setError("");
 
-                const data = await getOrderDetails(orderId!);
+                const data = await getOrderDetails(currentOrderId);
 
                 if (!cancelled) {
                     setResult(data);
@@ -66,7 +59,7 @@ export default function OrderSuccessPage() {
         return () => {
             cancelled = true;
         };
-    }, [status, orderId, router]);
+    }, [status, orderId]);
 
     if (status === "loading" || loading) {
         return (
@@ -80,6 +73,30 @@ export default function OrderSuccessPage() {
         return (
             <main className="mx-auto max-w-3xl p-6">
                 <p>Weiterleitung zum Login...</p>
+            </main>
+        );
+    }
+
+    if (!orderId) {
+        return (
+            <main className="mx-auto max-w-3xl p-6">
+                <div role="alert" className="rounded border p-6">
+                    <h1 className="mb-3 text-2xl font-bold">
+                        Bestelldetails nicht verfügbar
+                    </h1>
+
+                    <p className="mb-4 text-red-700">
+                        Es wurde keine Bestellnummer angegeben.
+                    </p>
+
+                    <button
+                        type="button"
+                        onClick={() => router.push("/orders")}
+                        className="rounded bg-black px-4 py-2 text-white"
+                    >
+                        Meine Bestellungen
+                    </button>
+                </div>
             </main>
         );
     }
@@ -199,5 +216,21 @@ export default function OrderSuccessPage() {
                 </button>
             </div>
         </main>
+    );
+}
+
+export default function OrderSuccessPage() {
+    return (
+        <Suspense
+            fallback={
+                <main className="mx-auto max-w-3xl p-6">
+                    <p role="status">
+                        Bestelldetails werden geladen...
+                    </p>
+                </main>
+            }
+        >
+            <OrderSuccessContent />
+        </Suspense>
     );
 }

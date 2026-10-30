@@ -85,10 +85,45 @@ export default function AdminOrdersPage() {
     }, [status, user, isAdmin, router]);
 
     useEffect(() => {
-        if (status === "authenticated" && isAdmin) {
-            void loadOrders();
+        if (status !== "authenticated" || !isAdmin) {
+            return;
         }
-    }, [status, isAdmin, loadOrders]);
+
+        let cancelled = false;
+
+        async function fetchOrders() {
+            try {
+                setLoading(true);
+                setError("");
+
+                const data = await getAllOrders(
+                    page,
+                    10,
+                    filterStatus ? (filterStatus as OrderStatus) : undefined
+                );
+
+                if (cancelled) return;
+
+                setOrders(data.orders);
+                setTotal(data.pagination.total);
+                setTotalPages(data.pagination.total_pages);
+            } catch {
+                if (!cancelled) {
+                    setError("Bestellungen konnten nicht geladen werden.");
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
+        }
+
+        void fetchOrders();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [status, isAdmin, page, filterStatus]);
 
     async function handleStatusChange(
         orderId: string,
@@ -134,7 +169,7 @@ export default function AdminOrdersPage() {
                     Bestellverwaltung
                 </h1>
 
-                <p className="mt-2 text-gray-600">
+                <p className="mt-2 text-gray-50">
                     Verwalte alle Bestellungen deiner Kunden.
                 </p>
             </div>
@@ -157,7 +192,7 @@ export default function AdminOrdersPage() {
                 </div>
             )}
 
-            <section className="mb-6 rounded-lg border p-4">
+            <section className="mb-6 rounded-lg border p-4 bg-gray-900">
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                     <div>
                         <p className="text-sm text-gray-500">
@@ -207,7 +242,7 @@ export default function AdminOrdersPage() {
                     {orders.map(({ order, items }) => (
                         <article
                             key={order.id}
-                            className="rounded-lg border p-5"
+                            className="rounded-lg border p-5 bg-gray-900"
                         >
                             <div className="flex flex-col justify-between gap-4 sm:flex-row">
                                 <div>

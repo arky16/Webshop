@@ -166,7 +166,7 @@ export default function Home() {
                     Unsere Produkte
                 </h1>
 
-                <p className="mt-3 text-gray-600">
+                <p className="mt-3 text-gray-50">
                     Entdecke unsere aktuellen Produkte
                 </p>
             </header>
